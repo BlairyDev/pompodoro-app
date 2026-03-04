@@ -1,18 +1,26 @@
 package com.example.pomopodorotimer.ui.screen
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pomopodorotimer.model.SessionType
+import com.example.pomopodorotimer.ui.theme.PomopodoroTimerTheme
 import com.example.pomopodorotimer.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
 
@@ -65,29 +73,50 @@ fun HomeContent(
         }
     }
 
-    Column {
-        Text(text = "Time left: $displayTime")
-        Button(
-            onClick = {
-                if (isPaused) {
-                    onResumeChange()
-                } else {
-                    onPausedChange()
+    Column(
+        modifier = modifier
+            .fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Time left: $displayTime",
+            fontSize = 40.sp
+        )
+
+        Row(
+            modifier = modifier
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(
+                onClick = {
+                    if (isPaused) {
+                        onResumeChange()
+                    } else {
+                        onPausedChange()
+                    }
                 }
+            ) {
+                Text(text = if (isPaused) "Resume" else "Pause")
             }
-        ) {
-            Text(text = if (isPaused) "Resume" else "Pause")
-        }
-        Button(
-            onClick = {
-                resetTimer()
+
+            Spacer(
+                modifier = Modifier.padding(10.dp)
+            )
+
+            Button(
+                onClick = {
+                    resetTimer()
+                }
+            ) {
+                Text(text = "Reset")
             }
-        ) {
-            Text(text = "Reset")
         }
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             Button(
                 onClick = {
@@ -120,8 +149,19 @@ fun HomeContent(
     }
 }
 
-@Preview
+@Preview(showBackground = true)
 @Composable
 private fun HomePreview() {
-    
+    PomopodoroTimerTheme {
+        HomeContent(
+            timeLeft = 0,
+            displayTime = "10:00",
+            isPaused = false,
+            onTimeChange = {},
+            onPausedChange = {},
+            onResumeChange = {},
+            onChangeDurationClick = {},
+            resetTimer = {}
+        )
+    }
 }

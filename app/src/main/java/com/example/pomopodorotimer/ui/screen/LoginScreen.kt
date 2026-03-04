@@ -1,5 +1,6 @@
 package com.example.pomopodorotimer.ui.screen
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -19,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.pomopodorotimer.ui.theme.PomopodoroTimerTheme
 import com.example.pomopodorotimer.viewmodel.AuthState
 import com.example.pomopodorotimer.viewmodel.AuthViewModel
 
@@ -66,8 +69,12 @@ fun LoginContent(
 ) {
     Column(
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
+        Text("Pompodoro App")
+
         OutlinedTextField(
             value = email,
             onValueChange ={
@@ -103,4 +110,16 @@ fun LoginContent(
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview(modifier: Modifier = Modifier) {
+    PomopodoroTimerTheme {
+        LoginContent(
+            onHomeClicked = {},
+            email = "",
+            password = "",
+            onLoginClicked = { _, _ ->
+
+            },
+            onEmailChanged = {},
+            onPasswordChanged = {}
+        )
+    }
 }

@@ -13,7 +13,7 @@ import kotlin.time.Duration.Companion.seconds
 class HomeViewModel @Inject constructor() : ViewModel() {
 
     private val _selectedDuration = MutableStateFlow(SessionType.TEN)
-    private val _timeLeft = MutableStateFlow<Long>(SessionType.TEN.minutes)
+    private val _timeLeft = MutableStateFlow<Long>(SessionType.TEN.minutes * 60)
     val timeLeft: StateFlow<Long> = _timeLeft
 
     private val _displayTime = MutableStateFlow(SessionType.TEN.displayTime)
