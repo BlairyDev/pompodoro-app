@@ -1,5 +1,6 @@
 package com.example.pomopodorotimer.ui.screen
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +12,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,17 +24,32 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pomopodorotimer.model.SessionType
 import com.example.pomopodorotimer.ui.theme.PomopodoroTimerTheme
+import com.example.pomopodorotimer.viewmodel.AuthState
+import com.example.pomopodorotimer.viewmodel.AuthViewModel
 import com.example.pomopodorotimer.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    homeViewModel: HomeViewModel = hiltViewModel()
+    onBackClicked: () -> Unit,
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val timeLeft by homeViewModel.timeLeft.collectAsStateWithLifecycle()
     val displayTime by homeViewModel.displayTime.collectAsStateWithLifecycle()
     val isPaused by homeViewModel.isPaused.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(authState) {
+        when(authState) {
+            is AuthState.Unauthenticated -> onBackClicked()
+            is AuthState.Error -> Toast.makeText(context,
+                (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
+            else -> Unit
+        }
+    }
 
     HomeContent(
         timeLeft = timeLeft,
@@ -49,6 +67,9 @@ fun HomeScreen(
         resetTimer = {
             homeViewModel.resetTimer()
         },
+        onSignOutClicked = {
+            authViewModel.signOut()
+        },
         onChangeDurationClick = homeViewModel::onChangeDurationClick
     )
 }
@@ -62,6 +83,7 @@ fun HomeContent(
     onTimeChange: () -> Unit,
     onPausedChange: () -> Unit,
     onResumeChange: () -> Unit,
+    onSignOutClicked: () -> Unit,
     onChangeDurationClick: (SessionType) -> Unit,
     resetTimer: () -> Unit,
 ) {
@@ -72,7 +94,13 @@ fun HomeContent(
             onTimeChange()
         }
     }
-
+    Button(
+        onClick = {
+            onSignOutClicked()
+        }
+    ) {
+        Text("Sign out")
+    }
     Column(
         modifier = modifier
             .fillMaxSize(),
@@ -160,6 +188,7 @@ private fun HomePreview() {
             onTimeChange = {},
             onPausedChange = {},
             onResumeChange = {},
+            onSignOutClicked = {},
             onChangeDurationClick = {},
             resetTimer = {}
         )

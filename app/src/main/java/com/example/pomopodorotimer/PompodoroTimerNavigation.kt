@@ -8,6 +8,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.example.pomopodorotimer.ui.screen.HomeScreen
 import com.example.pomopodorotimer.ui.screen.LoginScreen
+import com.example.pomopodorotimer.ui.screen.RegisterScreen
 import kotlinx.serialization.Serializable
 
 
@@ -15,10 +16,10 @@ import kotlinx.serialization.Serializable
 data object LoginDestination : NavKey
 
 @Serializable
-data object SignUpDestination : NavKey
+data object RegisterDestination : NavKey
 
 @Serializable
-data class HomeDestination(val userId: String) : NavKey
+data object HomeDestination : NavKey
 
 @Composable
 fun PompodoroTimerNavigation(modifier: Modifier = Modifier) {
@@ -31,13 +32,30 @@ fun PompodoroTimerNavigation(modifier: Modifier = Modifier) {
         entryProvider = entryProvider {
             entry<LoginDestination> {
                 LoginScreen(
-                    onHomeClicked = { userId ->
-                        backStack.add(HomeDestination(userId))
+                    onHomeClicked = {
+                        backStack.add(HomeDestination)
+                    },
+                    onRegisterClicked = {
+                        backStack.add(RegisterDestination)
+                    }
+                )
+            }
+            entry<RegisterDestination>{
+                RegisterScreen(
+                    onHomeClicked = {
+                        backStack.add(HomeDestination)
+                    },
+                    onBackClicked = {
+                        backStack.removeLastOrNull()
                     }
                 )
             }
             entry<HomeDestination> {
-                HomeScreen()
+                HomeScreen(
+                    onBackClicked = {
+                        backStack.removeLastOrNull()
+                    }
+                )
             }
         }
     )
