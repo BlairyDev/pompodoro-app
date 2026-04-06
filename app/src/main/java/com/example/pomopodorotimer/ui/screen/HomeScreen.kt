@@ -112,14 +112,25 @@ fun HomeScreen(
             var holdCount = 0
             val holdLimit = 8 
             
+            // Fading logic
+            var currentVolume = 0f
+            val fadeIncrement = 0.0001f // Adjust for faster/slower fade
+            
             try {
                 while (isActive) {
                     if (!currentIsPaused && currentSelectedNoise != NoiseType.NONE) {
                         if (audioTrack.playState != AudioTrack.PLAYSTATE_PLAYING) {
                             audioTrack.play()
+                            currentVolume = 0f // Reset volume on start
                         }
                         
                         for (i in buffer.indices) {
+                            // Apply fade-in
+                            if (currentVolume < 1f) {
+                                currentVolume += fadeIncrement
+                            }
+                            val volumeFactor = currentVolume.coerceIn(0f, 1f)
+
                             if (currentSelectedNoise == NoiseType.BROWN) {
                                 if (holdCount >= holdLimit) {
                                     holdValue = Random.nextFloat() * 2f - 1f
@@ -127,11 +138,11 @@ fun HomeScreen(
                                 }
                                 holdCount++
                                 lastOut = lastOut + 0.15f * (holdValue - lastOut)
-                                buffer[i] = (lastOut * Short.MAX_VALUE * 0.8f)
+                                buffer[i] = (lastOut * Short.MAX_VALUE * 0.8f * volumeFactor)
                                     .toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                             } else {
                                 val white = Random.nextFloat() * 2f - 1f
-                                buffer[i] = (white * Short.MAX_VALUE * 0.4f)
+                                buffer[i] = (white * Short.MAX_VALUE * 0.4f * volumeFactor)
                                     .toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                             }
                         }
@@ -141,6 +152,7 @@ fun HomeScreen(
                             audioTrack.pause()
                             audioTrack.flush()
                         }
+                        currentVolume = 0f // Reset volume when paused
                         delay(100) // Idle check
                     }
                 }
@@ -154,7 +166,6 @@ fun HomeScreen(
             }
         }
     }
-
     HomeContent(
         timeLeft = timeLeft,
         displayTime = displayTime,
