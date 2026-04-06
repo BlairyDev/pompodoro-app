@@ -9,6 +9,10 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 
+enum class NoiseType {
+    NONE, WHITE, BROWN
+}
+
 @HiltViewModel
 class HomeViewModel @Inject constructor() : ViewModel() {
 
@@ -22,6 +26,9 @@ class HomeViewModel @Inject constructor() : ViewModel() {
     private val _isPaused = MutableStateFlow(true)
     val isPaused: StateFlow<Boolean> = _isPaused
 
+    private val _selectedNoise = MutableStateFlow(NoiseType.NONE)
+    val selectedNoise: StateFlow<NoiseType> = _selectedNoise
+
     fun convertSecondsToActualTime() {
         val duration = _timeLeft.value.seconds
 
@@ -31,8 +38,12 @@ class HomeViewModel @Inject constructor() : ViewModel() {
     }
 
     fun onTimeChange() {
-        _timeLeft.value--
-        convertSecondsToActualTime()
+        if (_timeLeft.value > 0) {
+            _timeLeft.value--
+            convertSecondsToActualTime()
+        } else {
+            _isPaused.value = true
+        }
     }
 
     fun onPausedChange() {
@@ -44,7 +55,8 @@ class HomeViewModel @Inject constructor() : ViewModel() {
     }
 
     fun resetTimer() {
-        _timeLeft.value = _selectedDuration.value.minutes
+        val seconds = _selectedDuration.value.minutes * 60
+        _timeLeft.value = seconds
         _displayTime.value = _selectedDuration.value.displayTime
         _isPaused.value = true
     }
@@ -57,5 +69,7 @@ class HomeViewModel @Inject constructor() : ViewModel() {
         _isPaused.value = true
     }
 
-
+    fun onNoiseSelected(noiseType: NoiseType) {
+        _selectedNoise.value = if (_selectedNoise.value == noiseType) NoiseType.NONE else noiseType
+    }
 }
