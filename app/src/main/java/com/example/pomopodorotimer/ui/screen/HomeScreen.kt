@@ -3,8 +3,9 @@ package com.example.pomopodorotimer.ui.screen
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
@@ -23,23 +25,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.pomopodorotimer.R
 import com.example.pomopodorotimer.model.SessionType
 import com.example.pomopodorotimer.ui.theme.PomopodoroTimerTheme
-import com.example.pomopodorotimer.viewmodel.AuthState
-import com.example.pomopodorotimer.viewmodel.AuthViewModel
 import com.example.pomopodorotimer.viewmodel.HomeViewModel
 import com.example.pomopodorotimer.viewmodel.NoiseType
+import com.example.pomopodorotimer.viewmodel.TimerMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -51,13 +56,14 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onBackClicked: () -> Unit,
     homeViewModel: HomeViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
 ) {
-    val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val timeLeft by homeViewModel.timeLeft.collectAsStateWithLifecycle()
     val displayTime by homeViewModel.displayTime.collectAsStateWithLifecycle()
     val isPaused by homeViewModel.isPaused.collectAsStateWithLifecycle()
     val selectedNoise by homeViewModel.selectedNoise.collectAsStateWithLifecycle()
+    val mode by homeViewModel.mode.collectAsStateWithLifecycle()
+    val interval by homeViewModel.interval.collectAsStateWithLifecycle()
+    val hasStarted by homeViewModel.hasStarted.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Audio Track setup
@@ -159,7 +165,10 @@ fun HomeScreen(
         timeLeft = timeLeft,
         displayTime = displayTime,
         isPaused = isPaused,
+        hasStarted = hasStarted,
         selectedNoise = selectedNoise,
+        mode = mode,
+        interval = interval,
         onTimeChange = {
             homeViewModel.onTimeChange()
         },
@@ -172,8 +181,8 @@ fun HomeScreen(
         resetTimer = {
             homeViewModel.resetTimer()
         },
-        onSignOutClicked = {
-            authViewModel.signOut()
+        onCancelConfirmed = {
+            homeViewModel.resetAll()
         },
         onChangeDurationClick = homeViewModel::onChangeDurationClick,
         onNoiseSelected = homeViewModel::onNoiseSelected
@@ -186,46 +195,43 @@ fun HomeContent(
     timeLeft: Long,
     displayTime: String,
     isPaused: Boolean,
+    hasStarted: Boolean,
     selectedNoise: NoiseType,
+    mode: TimerMode,
+    interval: Int,
     onTimeChange: () -> Unit,
     onPausedChange: () -> Unit,
     onResumeChange: () -> Unit,
-    onSignOutClicked: () -> Unit,
+    onCancelConfirmed: () -> Unit,
     onChangeDurationClick: (SessionType) -> Unit,
     onNoiseSelected: (NoiseType) -> Unit,
     resetTimer: () -> Unit,
 ) {
     // Determine if the timer is at its initial state for the current session type
-    val isAtStart = remember(displayTime) {
-        SessionType.entries.any { it.displayTime == displayTime }
+    val isAtStart = timeLeft == when (mode) {
+        TimerMode.WORK -> SessionType.entries
+            .first { it == SessionType.TEN || it == SessionType.TWENTY_FIVE || it == SessionType.FIFTY }
+            .minutes * 60
+        TimerMode.BREAK -> timeLeft // or just false
     }
-
     LaunchedEffect(key1 = timeLeft, key2 = isPaused) {
         while (timeLeft > 0 && !isPaused) {
             delay(1000L)
             onTimeChange()
         }
     }
+
+    var showCancelDialog by remember { mutableStateOf(false) }
     
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(color = Color(0xFFCDA564))
             .padding(16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(
-                onClick = {
-                    onSignOutClicked()
-                }
-            ) {
-                Text("Sign out")
-            }
-        }
+        Image(painter = painterResource(R.drawable.image), contentDescription = "logo")
         
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -235,6 +241,11 @@ fun HomeContent(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "${mode.name} • Interval $interval/4",
+            fontSize = 18.sp
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -247,7 +258,11 @@ fun HomeContent(
                     } else {
                         onPausedChange()
                     }
-                }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2B2B2B),
+                    contentColor = Color.White
+                )
             ) {
                 val buttonText = when {
                     !isPaused -> "Pause"
@@ -257,39 +272,112 @@ fun HomeContent(
                 Text(text = buttonText)
             }
 
-            Spacer(
-                modifier = Modifier.padding(10.dp)
-            )
+        }
 
-            Button(
-                onClick = {
-                    resetTimer()
-                }
+        if (hasStarted) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Text(text = "Reset")
+                Button(
+                    onClick = {
+                        resetTimer()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2B2B2B),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(text = "Reset")
+                }
+
+                Spacer(
+                    modifier = Modifier.padding(10.dp)
+                )
+
+                Button(
+                    onClick = { showCancelDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2B2B2B),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Cancel")
+                }
+
+                if (showCancelDialog) {
+                    AlertDialog(
+                        containerColor = Color(0xFFCDA564),
+                        onDismissRequest = { showCancelDialog = false },
+                        title = { Text("Cancel Timer") },
+                        text = { Text("Are you sure?") },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showCancelDialog = false
+                                    onCancelConfirmed()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2B2B2B),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Confirm")
+                            }
+                        },
+                        dismissButton = {
+                            Button(
+                                onClick = { showCancelDialog = false },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2B2B2B),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+
             }
+
         }
         
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            Button(
-                onClick = { onChangeDurationClick(SessionType.TEN) }
+        if (!hasStarted) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                Text("${SessionType.TEN.minutes} mins")
-            }
-            Button(
-                onClick = { onChangeDurationClick(SessionType.TWENTY_FIVE) }
-            ) {
-                Text("${SessionType.TWENTY_FIVE.minutes} mins")
-            }
-            Button(
-                onClick = { onChangeDurationClick(SessionType.FIFTY) }
-            ) {
-                Text("${SessionType.FIFTY.minutes} mins")
+                Button(
+                    onClick = { onChangeDurationClick(SessionType.TEN) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2B2B2B),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("${SessionType.TEN.minutes} mins")
+                }
+                Button(
+                    onClick = { onChangeDurationClick(SessionType.TWENTY_FIVE) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2B2B2B),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("${SessionType.TWENTY_FIVE.minutes} mins")
+                }
+                Button(
+                    onClick = { onChangeDurationClick(SessionType.FIFTY) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2B2B2B),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("${SessionType.FIFTY.minutes} mins")
+                }
             }
         }
 
@@ -337,6 +425,8 @@ fun HomeContent(
     }
 }
 
+
+
 @Preview(showBackground = true)
 @Composable
 private fun HomePreview() {
@@ -345,13 +435,16 @@ private fun HomePreview() {
             timeLeft = 0,
             displayTime = "10:00",
             isPaused = true,
+            hasStarted = true,
             selectedNoise = NoiseType.NONE,
             onTimeChange = {},
             onPausedChange = {},
             onResumeChange = {},
-            onSignOutClicked = {},
+            onCancelConfirmed = {},
             onChangeDurationClick = {},
             onNoiseSelected = {},
+            mode = TimerMode.WORK,
+            interval = 1,
             resetTimer = {}
         )
     }
