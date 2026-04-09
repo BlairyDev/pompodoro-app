@@ -1,128 +1,96 @@
-    package com.example.pomopodorotimer.viewmodel
+package com.example.pomopodorotimer.viewmodel
 
-    import androidx.lifecycle.ViewModel
-    import com.example.pomopodorotimer.model.SessionType
-    import dagger.hilt.android.lifecycle.HiltViewModel
-    import kotlinx.coroutines.flow.MutableStateFlow
-    import kotlinx.coroutines.flow.StateFlow
-    import java.util.Locale
-    import javax.inject.Inject
-    import kotlin.time.Duration.Companion.seconds
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.pomopodorotimer.data.repository.AuthRepository
+import com.example.pomopodorotimer.data.repository.TimerRepository
+import com.example.pomopodorotimer.model.SessionType
+import com.example.pomopodorotimer.model.TimerSession
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-    enum class NoiseType {
-        NONE, WHITE, BROWN
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val timerRepository: TimerRepository
+) : ViewModel() {
+
+    private val _selectedSession = MutableStateFlow(SessionType.TWENTY_FIVE)
+    val selectedSession: StateFlow<SessionType> = _selectedSession.asStateFlow()
+
+    private val _timeLeft = MutableStateFlow(SessionType.TWENTY_FIVE.minutes * 60)
+    val timeLeft: StateFlow<Long> = _timeLeft.asStateFlow()
+
+    private val _displayTime = MutableStateFlow(formatTime(_timeLeft.value))
+    val displayTime: StateFlow<String> = _displayTime.asStateFlow()
+
+    private val _isPaused = MutableStateFlow(false)
+    val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
+
+    fun onTimeChange() {
+        if (_timeLeft.value > 0) {
+            _timeLeft.value -= 1
+            _displayTime.value = formatTime(_timeLeft.value)
+
+            if (_timeLeft.value == 0L) {
+                saveCompletedSession()
+            }
+        }
     }
 
-    enum class TimerMode {
-        WORK, BREAK
+    fun onPausedChange() {
+        _isPaused.value = true
     }
 
-    @HiltViewModel
-    class HomeViewModel @Inject constructor() : ViewModel() {
+    fun onResumeChange() {
+        _isPaused.value = false
+    }
 
-        private val _selectedDuration = MutableStateFlow(SessionType.TEN)
-        private val _timeLeft = MutableStateFlow<Long>(SessionType.TEN.minutes * 60)
-        val timeLeft: StateFlow<Long> = _timeLeft
+    fun resetTimer() {
+        _timeLeft.value = _selectedSession.value.minutes * 60
+        _displayTime.value = formatTime(_timeLeft.value)
+        _isPaused.value = false
+    }
 
-        private val _displayTime = MutableStateFlow(SessionType.TEN.displayTime)
-        val displayTime: StateFlow<String> = _displayTime
+    fun onChangeDurationClick(sessionType: SessionType) {
+        _selectedSession.value = sessionType
+        _timeLeft.value = sessionType.minutes * 60
+        _displayTime.value = formatTime(_timeLeft.value)
+        _isPaused.value = false
 
-        private val _isPaused = MutableStateFlow(true)
-        val isPaused: StateFlow<Boolean> = _isPaused
-
-        private val _selectedNoise = MutableStateFlow(NoiseType.NONE)
-        val selectedNoise: StateFlow<NoiseType> = _selectedNoise
-
-        private val _mode = MutableStateFlow(TimerMode.WORK)
-        val mode: StateFlow<TimerMode> = _mode
-
-        private val _interval = MutableStateFlow(1)
-        val interval: StateFlow<Int> = _interval
-
-        private val _hasStarted = MutableStateFlow(false)
-        val hasStarted: StateFlow<Boolean> = _hasStarted
-
-        fun convertSecondsToActualTime() {
-            val duration = _timeLeft.value.seconds
-
-            _displayTime.value = duration.toComponents { _, minutes, seconds, _ ->
-                String.format(Locale.getDefault(), "%02d:%02d",  minutes, seconds)
+        val uid = authRepository.getUserId()
+        if (uid.isNotBlank()) {
+            viewModelScope.launch {
+                timerRepository.updateDefaultSession(uid, sessionType)
             }
-        }
-
-        fun onTimeChange() {
-            if (_timeLeft.value > 0) {
-                _timeLeft.value--
-                convertSecondsToActualTime()
-            } else {
-                handleSessionEnd()
-            }
-        }
-
-        private fun handleSessionEnd() {
-            if (_mode.value == TimerMode.WORK) {
-                // Switch to BREAK
-                _mode.value = TimerMode.BREAK
-                _timeLeft.value = getBreakDuration()
-            } else {
-                // Break finished
-                if (_interval.value < 4) {
-                    _interval.value++
-
-                    _mode.value = TimerMode.WORK
-                    _timeLeft.value = _selectedDuration.value.minutes * 60
-                } else {
-                    // Finished all 4 intervals
-                    resetAll()
-                    return
-                }
-            }
-
-            convertSecondsToActualTime()
-        }
-
-        fun onPausedChange() {
-            _isPaused.value = true
-        }
-
-        fun onResumeChange() {
-            _isPaused.value = false
-            _hasStarted.value = true
-        }
-
-        fun resetTimer() {
-            val seconds = _selectedDuration.value.minutes * 60
-            _timeLeft.value = seconds
-            _displayTime.value = _selectedDuration.value.displayTime
-            _isPaused.value = true
-        }
-
-        fun onChangeDurationClick(durationSession: SessionType) {
-            val seconds = durationSession.minutes * 60
-            _selectedDuration.value = durationSession
-            _timeLeft.value = seconds
-            _displayTime.value = durationSession.displayTime
-            _isPaused.value = true
-        }
-
-        fun onNoiseSelected(noiseType: NoiseType) {
-            _selectedNoise.value = if (_selectedNoise.value == noiseType) NoiseType.NONE else noiseType
-        }
-
-        private fun getBreakDuration(): Long {
-            return when (_selectedDuration.value) {
-                SessionType.TEN -> 3 * 60
-                SessionType.TWENTY_FIVE -> 5 * 60
-                SessionType.FIFTY -> 15 * 60
-            }
-        }
-
-        fun resetAll() {
-            _interval.value = 1
-            _mode.value = TimerMode.WORK
-            _timeLeft.value = _selectedDuration.value.minutes * 60
-            _displayTime.value = _selectedDuration.value.displayTime
-            _isPaused.value = true
-            _hasStarted.value = false
         }
     }
+
+    private fun saveCompletedSession() {
+        val uid = authRepository.getUserId()
+        if (uid.isBlank()) return
+
+        val session = TimerSession(
+            sessionType = _selectedSession.value.name,
+            plannedMinutes = _selectedSession.value.minutes,
+            completedMinutes = _selectedSession.value.minutes,
+            completed = true,
+            completedAt = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch {
+            timerRepository.saveCompletedSession(uid, session)
+        }
+    }
+
+    private fun formatTime(seconds: Long): String {
+        val minutes = seconds / 60
+        val remainingSeconds = seconds % 60
+        return String.format("%02d:%02d", minutes, remainingSeconds)
+    }
+}
+
